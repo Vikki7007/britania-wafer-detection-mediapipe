@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0b1020">
+  <title>Combined Wafer & Eating Detection System</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body { 
+      margin: 0; 
+      padding: 0;
+      background: #0b1020; 
+      color: #e8f0ff; 
+      font-family: system-ui, Arial;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      /* Android safe area support */
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+    
+    header { 
+      padding: 8px 12px; 
+      font-weight: 600; 
+      text-align: center;
+      font-size: 16px;
+      background: rgba(11, 16, 32, 0.95);
+      backdrop-filter: blur(10px);
+      flex-shrink: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 10;
+    }
+    
+    .stage {
+      position: relative; 
+      width: 100%; 
+      flex: 1;
+      background: #111; 
+      overflow: hidden;
+    }
+    
+    video, canvas { 
+      position: absolute; 
+      top: 0;
+      left: 0;
+      width: 100%; 
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .status-panel {
+      background: rgba(26, 26, 46, 0.95);
+      backdrop-filter: blur(15px);
+      padding: 12px;
+      flex-shrink: 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      max-height: 35vh;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 6px 0;
+      padding: 8px 12px;
+      background: rgba(22, 33, 62, 0.8);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .status-label {
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .status-value {
+      font-weight: bold;
+      text-align: right;
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+
+    .pass { color: #7cff8e; }
+    .fail { color: #ff7c7c; }
+    .warning { color: #ffd24d; }
+    .info { color: #7cc8ff; }
+    
+    .hint { 
+      text-align: center; 
+      opacity: 0.7; 
+      padding: 8px 12px; 
+      font-size: 11px;
+      background: rgba(11, 16, 32, 0.9);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      z-index: 10;
+    }
+
+    /* Compact mode toggle */
+    .toggle-panel {
+      position: fixed;
+      top: calc(env(safe-area-inset-top) + 50px);
+      right: 12px;
+      z-index: 1000;
+      background: rgba(26, 26, 46, 0.9);
+      border-radius: 20px;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+      touch-action: manipulation;
+    }
+
+    .status-panel.minimized {
+      max-height: 60px;
+      overflow: hidden;
+    }
+
+    .status-panel.minimized .status-row:not(:first-child) {
+      display: none;
+    }
+
+    /* Android-specific optimizations */
+    @media screen and (orientation: landscape) and (max-height: 500px) {
+      header {
+        padding: 4px 8px;
+        font-size: 14px;
+      }
+      
+      .status-panel {
+        max-height: 30vh;
+        padding: 8px;
+      }
+      
+      .status-row {
+        margin: 4px 0;
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+      
+      .hint {
+        padding: 4px 8px;
+        font-size: 10px;
+      }
+    }
+
+    /* Portrait mobile optimization */
+    @media screen and (orientation: portrait) {
+      .status-panel {
+        max-height: 40vh;
+      }
+    }
+
+    /* Small Android phones */
+    @media screen and (max-width: 380px) {
+      header {
+        font-size: 14px;
+        padding: 6px 8px;
+      }
+      
+      .status-row {
+        font-size: 12px;
+        padding: 6px 8px;
+      }
+      
+      .status-label,
+      .status-value {
+        font-size: 12px;
+      }
+    }
+
+    /* Hide scrollbars but keep functionality */
+    .status-panel::-webkit-scrollbar {
+      width: 2px;
+    }
+    
+    .status-panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .status-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 1px;
+    }
+
+    /* Prevent overscroll bounce on Android */
+    body {
+      overscroll-behavior: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Prevent text selection */
+    body {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+
+    /* Optimize for Android Chrome */
+    video {
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+    }
+  </style>
+</head>
+<body>
+  <header>Combined Wafer Detection & Eating Detection System</header>
+
+  <div class="toggle-panel" onclick="toggleStatusPanel()">📊</div>
+
+  <div class="stage">
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="status-panel" id="statusPanel">
+    <div class="status-row">
+      <span class="status-label">Wafer Detection Status:</span>
+      <span id="wafer-status" class="status-value fail">Loading model...</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Face Detection:</span>
+      <span id="face-status" class="status-value fail">❌</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Hand Detection:</span>
+      <span id="hand-status" class="status-value fail">❌</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Wafer to Mouth:</span>
+      <span id="wafer-mouth-status" class="status-value fail">Not Detected</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Eating Status:</span>
+      <span id="eating-status" class="status-value fail">Not Eating</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Chew Count (8s window):</span>
+      <span id="chew-count" class="status-value">0</span>
+    </div>
+  </div>
+
+  <p class="hint">
+    If the camera doesn't start, use HTTPS (or localhost) and allow camera permissions.<br>
+    Make sure model.json, metadata.json, and weights.bin are in the same folder for wafer detection.
+  </p>
+
+  <!-- TensorFlow.js for wafer detection -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0"></script>
+  <!-- Teachable Machine helper -->
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4/dist/teachablemachine-image.min.js"></script>
+  
+  <!-- MediaPipe Solutions for eating detection -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+  <script>
+    // Toggle status panel visibility
+    function toggleStatusPanel() {
+      const panel = document.getElementById('statusPanel');
+      panel.classList.toggle('minimized');
+    }
+
+    // Prevent zoom on double tap (Android Chrome)
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function (event) {
+      const now = (new Date()).getTime();
+      if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, false);
+  </script>
+
+  <script src="script.js"></script>
+</body>
+</html>
