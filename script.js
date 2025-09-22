@@ -2,7 +2,7 @@
 const URL = "./"; // model.json, metadata.json, weights.bin must be in same folder
 let model, maxPredictions;
 let waferFrameCount = 0;
-const REQUIRED_FRAMES = 6; // how many consecutive frames needed for PASS
+const REQUIRED_FRAMES = 2; // how many consecutive frames needed for PASS
 let waferDetected = false; // NEW: tracks if wafer has been detected
 
 // ===== EATING DETECTION VARIABLES =====
@@ -20,7 +20,7 @@ let latestHands = null;
 
 // Chew detection config/state
 const EAT_WINDOW_MS = 8000; // 8s window
-const CHEW_TARGET = 2;      // need >=2 chews in window
+const CHEW_TARGET = 1;      // need >=2 chews in window
 const OPEN_THR = 0.08;      // mouth open threshold (ratio)
 const CLOSE_THR = 0.04;     // mouth close threshold (ratio; lower than OPEN_THR)
 
@@ -156,7 +156,7 @@ async function predictWafer() {
       waferStatusEl.className = "status-value pass";
     } else {
       // Show current confidence and frame count
-      waferStatusEl.textContent = `Searching... Wafer: ${(waferProb * 100).toFixed(1)}% (${waferFrameCount}/${REQUIRED_FRAMES})`;
+      waferStatusEl.textContent = `Searching... Wafer: ${(waferProb * 75).toFixed(1)}% (${waferFrameCount}/${REQUIRED_FRAMES})`;
       waferStatusEl.className = "status-value warning";
     }
   } catch (err) {
